@@ -12,31 +12,31 @@ A Neotest adapter for running Go tests.
 - Inline diagnostics.
 - Works great with
   [andythigpen/nvim-coverage](https://github.com/andythigpen/nvim-coverage) for
-  displaying coverage in the sign column (per-test basis).
+  displaying coverage in the sign column (per-Go package, or per-test basis).
 - Monorepo support (detect, run and debug tests in sub-projects).
 - Supports table tests (relies on treesitter AST detection).
 - Supports nested test functions.
 
-## 🚧 Pre-release
+## 🚧 Work in progress
 
-This Neotest adapter is under heavy development and considered beta. I'm,
-however, dogfooding myself with this project, as I use it daily as a full-time
-Go developer.
+This Neotest adapter is under heavy development and I'm dogfooding myself with
+this project on a daily basis, as full-time Go developer.
 
 My next focus areas:
 
 - [ ] Refactoring, polish and the addition of tests.
-- [ ] Versioning and releases via release-please.
 - [ ] Documentation around expanding new syntax support for table tests via AST
       parsing.
-- [ ] Add debug logging, set up bug report form.
-- [ ] Investigate ways to speed up test execution when running dir/file.
+- [ ] Add debug logging:
+      [neotest#422](https://github.com/nvim-neotest/neotest/discussions/422)
+- [ ] Investigate ways to speed up test execution when executing tests in a
+      file.
 
 ## 🏓 Background
 
 I've been using Neovim and Neotest with
 [neotest-go](https://github.com/nvim-neotest/neotest-go) but I have stumbled
-upon many problems which seems difficult to solve in the neotest-go codebase.
+upon many problems which seem difficult to solve in the neotest-go codebase.
 
 I have full respect for the time and efforts put in by the developer(s) of
 neotest-go. I do not aim in any way to diminish their needs or efforts.
@@ -75,9 +75,10 @@ return {
   {
     "nvim-neotest/neotest",
     dependencies = {
+      "nvim-neotest/nvim-nio",
       "nvim-lua/plenary.nvim",
-      "nvim-treesitter/nvim-treesitter",
       "antoinemadec/FixCursorHold.nvim",
+      "nvim-treesitter/nvim-treesitter",
       "fredrikaverpil/neotest-golang", -- Installation
     },
     config = function()
@@ -93,11 +94,13 @@ return {
 
 ## ⚙️ Configuration
 
-| Argument         | Default value                                   | Description                                                                               |
-| ---------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `go_test_args`   | `{ "-v", "-race", "-count=1", "-timeout=60s" }` | Arguments to pass into `go test`.                                                         |
-| `dap_go_enabled` | `false`                                         | Leverage [leoluz/nvim-dap-go](https://github.com/leoluz/nvim-dap-go) for debugging tests. |
-| `dap_go_opts`    | `{}`                                            | Options to pass into `require("dap-go").setup()`.                                         |
+| Argument                 | Default value                   | Description                                                                               |
+| ------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------- |
+| `go_test_args`           | `{ "-v", "-race", "-count=1" }` | Arguments to pass into `go test`.                                                         |
+| `dap_go_enabled`         | `false`                         | Leverage [leoluz/nvim-dap-go](https://github.com/leoluz/nvim-dap-go) for debugging tests. |
+| `dap_go_opts`            | `{}`                            | Options to pass into `require("dap-go").setup()`.                                         |
+| `warn_test_name_dupes`   | `true`                          | Warn about duplicate test names within the same Go package.                               |
+| `warn_test_not_executed` | `true`                          | Warn if test was not executed.                                                            |
 
 ### Example configuration: custom `go test` arguments
 
@@ -108,6 +111,8 @@ local config = { -- Specify configuration
     "-race",
     "-count=1",
     "-timeout=60s",
+    "-parallel=1",
+    "-p=2",
     "-coverprofile=" .. vim.fn.getcwd() .. "/coverage.out",
   },
 }
@@ -121,6 +126,8 @@ require("neotest").setup({
 Note that the example above writes a coverage file. You can use
 [andythigpen/nvim-coverage](https://github.com/andythigpen/nvim-coverage) to
 show the coverage in Neovim.
+
+See `go help test` for possible arguments.
 
 ### Example configuration: debugging
 
@@ -172,14 +179,13 @@ return {
     "nvim-neotest/neotest",
     event = "VeryLazy",
     dependencies = {
+      "nvim-neotest/nvim-nio",
       "nvim-lua/plenary.nvim",
       "antoinemadec/FixCursorHold.nvim",
       "nvim-treesitter/nvim-treesitter",
 
       "nvim-neotest/neotest-plenary",
       "nvim-neotest/neotest-vim-test",
-
-      "nvim-neotest/nvim-nio",
 
       {
         "fredrikaverpil/neotest-golang",
@@ -326,3 +332,22 @@ You can run tests, formatting and linting locally with `make all`. Install
 dependencies with `make install`. Have a look at the [Makefile](Makefile) for
 more details. You can also use the neotest-plenary and neotest-golang adapters
 to run the tests of this repo within Neovim.
+
+### AST and tree-sitter
+
+To figure out new tree-sitter queries (for detecting tests), the following
+commands are available in Neovim to aid you:
+
+- `:Inspect` to show the highlight groups under the cursor.
+- `:InspectTree` to show the parsed syntax tree (formerly known as
+  "TSPlayground").
+- `:EditQuery` to open the Live Query Editor (Nvim 0.10+).
+
+For example, open up a Go test file and then execute `:InspectTree`. A new
+window will appear which shows what the tree-sitter query syntax representation
+looks like for the Go test file.
+
+Again, from the Go test file, execute `:EditQuery` to open up the query editor
+in a separate window. In the editor, you can now start creating your syntax
+query and play around. You can paste in queries from `ast.lua` in the editor, to
+see how the query behaves and highlights parts of your Go test file.

@@ -6,10 +6,12 @@ local M = {}
 --- Build runspec for a single test
 --- @param pos neotest.Position
 --- @param strategy string
---- @return neotest.RunSpec
+--- @return neotest.RunSpec | neotest.RunSpec[] | nil
 function M.build(pos, strategy)
   --- @type string
   local test_name = convert.to_gotest_test_name(pos.id)
+  test_name = convert.to_gotest_regex_pattern(test_name)
+
   --- @type string
   local test_folder_absolute_path = string.match(pos.path, "(.+)/")
 
@@ -20,14 +22,12 @@ function M.build(pos, strategy)
   }
 
   --- @type table
-  local go_test_args = {
-    test_folder_absolute_path,
-    "-run",
-    "^" .. test_name .. "$",
-  }
+  local required_go_test_args = { test_folder_absolute_path, "-run", test_name }
 
-  local combined_args =
-    vim.list_extend(vim.deepcopy(options.get().go_test_args), go_test_args)
+  local combined_args = vim.list_extend(
+    vim.deepcopy(options.get().go_test_args),
+    required_go_test_args
+  )
   local gotest_command = vim.list_extend(vim.deepcopy(gotest), combined_args)
 
   --- @type neotest.RunSpec
@@ -37,7 +37,7 @@ function M.build(pos, strategy)
     context = {
       id = pos.id,
       test_filepath = pos.path,
-      test_type = "test",
+      pos_type = "test",
     },
   }
 
