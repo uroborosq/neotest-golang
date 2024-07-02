@@ -8,15 +8,72 @@ function M.detect_tests(file_path)
   local test_function = [[
     ; query for test function
     ((function_declaration
-      name: (identifier) @test.name) (#match? @test.name "^(Test|Example)"))
-      @test.definition
+    name: (identifier) @test.name)
+    (#match? @test.name "^(Test|Example)"))
+    @test.definition
+      
+    (
+      (function_declaration
+        name: (identifier) @namespace.name (#match? @namespace.name "^(Test|Example)")
+        body: (
+          block (expression_statement
+            (call_expression
+                arguments: (argument_list
+                  (identifier)
+                  (call_expression
+                    arguments: (argument_list (type_identifier) @testify.suite) 
+                )
+              )
+            )
+          )
+        )
+      ) 
 
-    ; query for subtest, like t.Run()
+      (method_declaration
+        receiver: (parameter_list
+          (parameter_declaration
+            type: (pointer_type (type_identifier) @testify.suite.local)
+          )
+        )
+        name: (field_identifier)      
+      ) @namespace.definition
+      (#eq? @testify.suite @testify.suite.local)
+    )  
+
+    (
+      (function_declaration
+        name: (identifier) @parent.method (#match? @parent.method "^(Test|Example)")
+        body: (
+          block (expression_statement
+            (call_expression
+                arguments: (argument_list
+                  (identifier)
+                  (call_expression
+                    arguments: (argument_list (type_identifier) @testify.suite) 
+                )
+              )
+            )
+          )
+        )
+      ) 
+
+      (method_declaration
+        receiver: (parameter_list
+          (parameter_declaration
+            type: (pointer_type (type_identifier) @testify.suite.local)
+          )
+        )
+        name: (field_identifier) @test.name 
+      ) @test.definition
+      (#match? @test.name "^(Test|Example)") 
+      (#eq? @testify.suite @testify.suite.local)
+    )
+
     (call_expression
       function: (selector_expression
         field: (field_identifier) @test.method) (#match? @test.method "^Run$")
       arguments: (argument_list . (interpreted_string_literal) @test.name))
-      @test.definition
+      @test.definition          
   ]]
 
   local test_method = [[
