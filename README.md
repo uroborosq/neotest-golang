@@ -1,70 +1,47 @@
 # neotest-golang
 
-A Neotest adapter for running Go tests.
+Reliable Neotest adapter for running Go tests in Neovim.
 
 <img width="1528" alt="neotest-golang" src="https://github.com/fredrikaverpil/neotest-golang/assets/994357/4f6e1fa6-2274-42e6-ba94-9a205061e5de">
 
 ## ⭐️ Features
 
 - Supports all [Neotest usage](https://github.com/nvim-neotest/neotest#usage).
-- Integrates with [nvim-dap-go](https://github.com/leoluz/nvim-dap-go) for
-  debugging of tests using delve.
+- Supports table tests and nested test functions (based on AST/tree-sitter
+  detection).
+- DAP support with [nvim-dap-go](https://github.com/leoluz/nvim-dap-go)
+  integration for debugging of tests using
+  [delve](https://github.com/go-delve/delve).
+- Monorepo support (detect, run and debug tests in sub-projects).
 - Inline diagnostics.
+- Custom `go test` argument support.
 - Works great with
   [andythigpen/nvim-coverage](https://github.com/andythigpen/nvim-coverage) for
   displaying coverage in the sign column (per-Go package, or per-test basis).
-- Monorepo support (detect, run and debug tests in sub-projects).
-- Supports table tests (relies on treesitter AST detection).
-- Supports nested test functions.
 
-## 🚧 Work in progress
+<details>
+<summary>Why a second Neotest adapter for Go? 🤔</summary>
 
-This Neotest adapter is under heavy development and I'm dogfooding myself with
-this project on a daily basis, as full-time Go developer.
-
-My next focus areas:
-
-- [ ] Refactoring, polish and the addition of tests.
-- [ ] Documentation around expanding new syntax support for table tests via AST
-      parsing.
-- [ ] Add debug logging:
-      [neotest#422](https://github.com/nvim-neotest/neotest/discussions/422)
-- [ ] Investigate ways to speed up test execution when executing tests in a
-      file.
-
-## 🏓 Background
-
-I've been using Neovim and Neotest with
-[neotest-go](https://github.com/nvim-neotest/neotest-go) but I have stumbled
-upon many problems which seem difficult to solve in the neotest-go codebase.
+While using [neotest-go](https://github.com/nvim-neotest/neotest-go) I stumbled
+upon many problems which seemed difficult to solve in that codebase.
 
 I have full respect for the time and efforts put in by the developer(s) of
-neotest-go. I do not aim in any way to diminish their needs or efforts.
+neotest-go. I do not aim in any way to diminish their needs or efforts. However,
+I wanted to see if I could fix these issues by diving into the 🕳️🐇 of Neotest
+and building my own adapter. Below is a list of neotest-go issues which are not
+present in neotest-golang (this project):
 
-However, I would like to see if, by building a Go adapter for Neotest from
-scratch, if I can mitigate the issues I have found with neotest-go.
+| Neotest-go issue                                        | URL                                                                   |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| DAP support                                             | [neotest-go#12](https://github.com/nvim-neotest/neotest-go/issues/12) |
+| Test Output in JSON, making it difficult to read        | [neotest-go#52](https://github.com/nvim-neotest/neotest-go/issues/52) |
+| Support for Nested Subtests                             | [neotest-go#74](https://github.com/nvim-neotest/neotest-go/issues/74) |
+| Diagnostics for table tests on the line of failure      | [neotest-go#75](https://github.com/nvim-neotest/neotest-go/issues/75) |
+| "Run nearest" runs all tests                            | [neotest-go#83](https://github.com/nvim-neotest/neotest-go/issues/83) |
+| Table tests not recognized when defined inside for-loop | [neotest-go#86](https://github.com/nvim-neotest/neotest-go/issues/86) |
+| Running test suite doesn't work                         | [neotest-go#89](https://github.com/nvim-neotest/neotest-go/issues/89) |
 
-### Neotest-go issues mitigated in neotest-golang
-
-- Test Output in JSON, making it difficult to read:
-  [neotest-go#52](https://github.com/nvim-neotest/neotest-go/issues/52)
-- "Run nearest" runs all tests:
-  [neotest-go#83](https://github.com/nvim-neotest/neotest-go/issues/83)
-- Running test suite doesn't work:
-  [neotest-go#89](https://github.com/nvim-neotest/neotest-go/issues/89)
-- Diagnostics for table tests on the line of failure:
-  [neotest-go#75](https://github.com/nvim-neotest/neotest-go/issues/75)
-- Support for Nested Subtests:
-  [neotest-go#74](https://github.com/nvim-neotest/neotest-go/issues/74)
-- DAP support:
-  [neotest-go#12](https://github.com/nvim-neotest/neotest-go/issues/12)
-
-### Upstream/dependency issues found during development
-
-- Test output is printed undesirably:
-  [neotest#391](https://github.com/nvim-neotest/neotest/issues/391). This is
-  currently mitigated in neotest-golang by reading the neotest-written test
-  output file on disk, parsing it and then erasing its contents.
+</details>
 
 ## 🥸 Installation
 
@@ -111,8 +88,6 @@ local config = { -- Specify configuration
     "-race",
     "-count=1",
     "-timeout=60s",
-    "-parallel=1",
-    "-p=2",
     "-coverprofile=" .. vim.fn.getcwd() .. "/coverage.out",
   },
 }
@@ -320,6 +295,66 @@ return {
 ```
 
 </details>
+
+## ⛑️ Tips & troubleshooting
+
+### Neotest is slowing down Neovim
+
+Neotest, out of the box with default settings, can appear very slow in large
+projects (here, I'm referring to
+[this kind of large](https://github.com/kubernetes/kubernetes)). There are a few
+things you can do to speed up the Neotest appearance and experience in such
+cases, by tweaking the Neotest settings.
+
+You can for example limit the AST-parsing (to detect tests) to the currently
+opened file, which in my opinion makes Neotest a joy to work with, even in
+ginormous projects. Second, you can tweak the concurrency settings, again for
+AST-parsing but also for concurrent test execution. Here is a simplistic example
+for [lazy.nvim](https://github.com/folke/lazy.nvim) to show what I mean:
+
+```lua
+return {
+  {
+    "nvim-neotest/neotest",
+    opts = {
+      -- See all config options with :h neotest.Config
+      discovery = {
+        -- Drastically improve performance in ginormous projects by
+        -- only AST-parsing the currently opened buffer.
+        enabled = false,
+        -- Number of workers to parse files concurrently.
+        -- A value of 0 automatically assigns number based on CPU.
+        -- Set to 1 if experiencing lag.
+        concurrent = 1,
+      },
+      running = {
+        -- Run tests concurrently when an adapter provides multiple commands to run.
+        concurrent = false,
+      },
+      summary = {
+        -- Enable/disable animation of icons.
+        animated = false,
+      },
+    },
+  },
+}
+```
+
+See `:h neotest.Config` for more information.
+
+[Here](https://github.com/fredrikaverpil/dotfiles/blob/main/nvim-fredrik/lua/plugins/neotest.lua)
+is my personal Neotest configuration, for inspiration. Please note that I am
+configuring Go and the neotest-golang adapter in a separate file
+[here](https://github.com/fredrikaverpil/dotfiles/blob/main/nvim-fredrik/lua/lang/go.lua).
+
+### Go test execution and parallelism
+
+You can set the optional neotest-go `go_test_args` to control the number of test
+binaries and number of tests to run in parallel using the `-p` and `-parallel`
+flags, respectively. Execute `go help test` and `go help testflag` for more
+information on this and perhaps have a look at
+[my own configuration](https://github.com/fredrikaverpil/dotfiles/blob/main/nvim-fredrik/lua/lang/go.lua)
+for inspiration.
 
 ## 🙏 PRs are welcome
 
