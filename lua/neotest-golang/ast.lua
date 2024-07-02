@@ -76,22 +76,6 @@ function M.detect_tests(file_path)
       @test.definition          
   ]]
 
-  local test_method = [[
-   ; query for test method
-   (method_declaration
-    name: (field_identifier) @test.name (#match? @test.name "^(Test|Example)")) @test.definition
-  ]]
-
-  local receiver_method = [[
-  ; query for receiver method, to be used as test suite namespace
-   (method_declaration
-    receiver: (parameter_list
-      (parameter_declaration
-        ; name: (identifier)
-        type: (pointer_type
-          (type_identifier) @namespace.name )))) @namespace.definition
-  ]]
-
   local table_tests = [[
     ;; query for list table tests
         (block
@@ -192,7 +176,7 @@ function M.detect_tests(file_path)
                     (#eq? @test.key.name @test.key.name1))))))))
   ]]
 
-  local query = test_function .. test_method .. receiver_method .. table_tests
+  local query = test_function .. table_tests
   local opts = { nested_tests = true }
 
   ---@type neotest.Tree
